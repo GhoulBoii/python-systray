@@ -18,7 +18,68 @@ class TBBUTTON(ctypes.Structure):
         ('iString', ctypes.c_int),
     ]
 
-# get the handle to the sytem tray
+class GUID(ctypes.Structure):
+    _fields_ = [
+        ("Data1", wintypes.DWORD),
+        ("Data2", wintypes.WORD),
+        ("Data3", wintypes.WORD),
+        ("Data4", wintypes.BYTE * 8)
+    ]
+
+class TrayItem(ctypes.Structure):
+    _fields_ = [
+        ("hWnd", wintypes.HWND),
+        ("uID", wintypes.UINT),
+        ("uCallbackMessage", wintypes.UINT),
+        ("dwState", wintypes.DWORD),
+        ("uVersion", wintypes.UINT),
+        ("hIcon", wintypes.HICON),
+        ("uIconDemoteTimerID", wintypes.WPARAM),
+        ("dwUserPref", wintypes.DWORD),
+        ("dwLastSoundTime", wintypes.DWORD),
+        ("szExeName", wintypes.WCHAR * 260),
+        ("szIconText", wintypes.WCHAR * 260),
+        ("uNumSeconds", wintypes.UINT),
+        ("guidItem", GUID)
+    ]
+
+    @property
+    def guidItem_python(self):
+        return uuid.UUID(bytes_le=bytes(self.guidItem))
+
+    @guidItem_python.setter
+    def guidItem_python(self, guid):
+        if isinstance(guid, uuid.UUID):
+            self.guidItem = GUID(*guid.fields)
+        else:
+            raise ValueError("Must be a UUID object")
+
+def get_tray_item(i, h_buffer, h_process, toolbar_hwnd):
+    tb_button = TBBUTTON()
+    tray_item = TrayItem()
+
+    # Send message to get button information
+    win32gui.SendMessage(toolbar_hwnd, TB_GETBUTTON, i, h_buffer)
+
+    # Read the memory into our button struct
+    button_info_buffer = win32process.ReadProcessMemory(h_process, h_buffer, ctypes.sizeof(TBBUTTON))
+    ctypes.memmove(ctypes.addressof(tb_button), button_info_buffer, ctypes.sizeof(TBBUTTON))
+
+    if tb_button.dwData != 0:
+        # Read the TrayItem data
+        tray_item_buffer = win32process.ReadProcessMemory(h_process, tb_button.dwData, ctypes.sizeof(TrayItem))
+        ctypes.memmove(ctypes.addressof(tray_item), tray_item_buffer, ctypes.sizeof(TrayItem))
+
+        # Set the state
+        if tb_button.fsState & TBSTATE_HIDDEN:
+            tray_item.dwState = 1
+        else:
+            tray_item.dwState = 0
+
+        print(f"ExplorerTrayService: Got tray item: {tray_item.szIconText}")
+
+    return tray_item
+
 hWnd = win32gui.FindWindow("Shell_TrayWnd", None)
 hWnd = win32gui.FindWindowEx(hWnd, None, "TrayNotifyWnd", None)
 hWnd = win32gui.FindWindowEx(hWnd, None, "SysPager", None)
@@ -43,19 +104,9 @@ h_buffer = win32process.VirtualAllocEx(
 tbButton = TBBUTTON()
 
 for i in range(numIcons):
-    # query the button into the memory we allocated
-    win32gui.SendMessage(hWnd, commctrl.TB_GETBUTTON, i, h_buffer)
-    button_info_buffer = win32process.ReadProcessMemory(h_process, h_buffer, ctypes.sizeof(TBBUTTON))
-    ctypes.memmove(ctypes.addressof(tbButton), button_info_buffer, ctypes.sizeof(TBBUTTON))
+    tray_item = get_tray_item(i, h_buffer, h_process, hWnd)
 
-    # Read the memory into our button struct
-    butHandle = w.DWORD()
-    butHandle_buffer = win32process.ReadProcessMemory(h_process, tbButton.dwData, ctypes.sizeof(w.DWORD))
-    ctypes.memmove(ctypes.addressof(butHandle), butHandle_buffer, ctypes.sizeof(w.DWORD))
 
-    # get the pid that created the button
-    _, butPid = win32process.GetWindowThreadProcessId(butHandle.value)
-
-    # i leave it to you to get the process from the pid
-    # that should be trivial...
-    print(butPid)
+   #  # i leave it to you to get the process from the pid
+   #  # that should be trivial...
+   #  print(butPid)
