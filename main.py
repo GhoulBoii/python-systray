@@ -1,10 +1,20 @@
 import commctrl, win32con
 import win32api
 import win32gui
+import win32ui
 import win32process
 import ctypes
-from ctypes import wintypes as w
+import struct
+from PIL import Image, ImageDraw
+from ctypes import wintypes
+import uuid
 
+# Add these constants
+WM_GETICON = 0x007F
+ICON_SMALL = 0
+ICON_BIG = 1
+TB_GETBUTTON = 0x417
+TBSTATE_HIDDEN = 0x8
 
 # represent the TBBUTTON structure
 class TBBUTTON(ctypes.Structure):
@@ -80,6 +90,7 @@ def get_tray_item(i, h_buffer, h_process, toolbar_hwnd):
 
     return tray_item
 
+# Usage example (you'll need to set these values appropriately)
 hWnd = win32gui.FindWindow("Shell_TrayWnd", None)
 hWnd = win32gui.FindWindowEx(hWnd, None, "TrayNotifyWnd", None)
 hWnd = win32gui.FindWindowEx(hWnd, None, "SysPager", None)
@@ -103,10 +114,48 @@ h_buffer = win32process.VirtualAllocEx(
 # init our tool bar button and a handle to it
 tbButton = TBBUTTON()
 
+def get_icon_dimension(hIcon):
+    iconinfo = win32gui.GetIconInfo(hIcon)
+    print(iconinfo)
+    bmInfo = win32gui.GetObject(iconinfo[3])
+    print(bmInfo)
+    return bmInfo.bmWidth, bmInfo.bmHeight
+
 for i in range(numIcons):
     tray_item = get_tray_item(i, h_buffer, h_process, hWnd)
 
+    hIcon = tray_item.hIcon
 
+    if hIcon:
+        # Get the actual icon dimensions
+        icon_width, icon_height = 32,32
+
+        # Create a device context
+        hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
+        hbmp = win32ui.CreateBitmap()
+        hbmp.CreateCompatibleBitmap(hdc, icon_width, icon_height)
+        hdc = hdc.CreateCompatibleDC()
+
+        hdc.SelectObject(hbmp)
+        hdc.DrawIcon((0, 0), hIcon)
+
+        bmpstr = hbmp.GetBitmapBits(True)
+
+        img = Image.frombuffer(
+            'RGBA',
+            (icon_width, icon_height),
+            bmpstr, 'raw', 'BGRA', 0, 1
+        )
+
+        # Now 'img' is a PIL Image object containing the full icon
+        # You can save it or process it further
+        img.save(f"tray_icon_{i}.png")
+
+        # Clean up
+        win32gui.DeleteObject(hbmp.GetHandle())
+        hdc.DeleteDC()
+    else:
+        print(f"Couldn't get icon for button {i}")
    #  # i leave it to you to get the process from the pid
    #  # that should be trivial...
    #  print(butPid)
