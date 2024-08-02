@@ -6,7 +6,8 @@ import win32api
 import win32con
 import win32gui
 import win32process
-from helper.icon_extractor import save_icon_as_image
+
+import utils.icon as icon_util
 
 TB_GETBUTTON = 0x417
 TBSTATE_HIDDEN = 0x8
@@ -57,6 +58,7 @@ def main():
     # Get the count of icons in the tray
     num_icons = win32api.SendMessage(hWnd, commctrl.TB_BUTTONCOUNT, 0, 0)
 
+    icon_images = []
     # Get process information
     _, process_id = win32process.GetWindowThreadProcessId(hWnd)
     h_process = win32api.OpenProcess(
@@ -81,9 +83,12 @@ def main():
             tray_item = get_tray_item(i, h_buffer, h_process, hWnd)
 
             if tray_item.hIcon:
-                save_icon_as_image(tray_item.hIcon, f"tray_icon_{i}.png")
+                icon_images.append(icon_util.get_image(tray_item.hIcon))
             else:
                 print(f"Couldn't get icon for button {i}")
+
+        # icon.util.save_images(icon_images, f"tray_icon_{i}.png")
+        icon_util.view_in_tk(icon_images)
 
     finally:
         # Clean up
