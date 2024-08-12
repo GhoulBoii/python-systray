@@ -1,8 +1,6 @@
-import tkinter as tk
-
 import win32gui
 import win32ui
-from PIL import Image, ImageTk
+from PIL import Image
 
 
 def get_dimension(hIcon):
@@ -45,21 +43,3 @@ def save_images(images, filename):
     """
     for image in images:
         image.save(filename)
-
-
-def view_in_tk(images):
-    root = tk.Tk()
-    root.configure(background="black")
-    canvas = tk.Canvas(root)
-    canvas.configure(background="black")
-    x_offset = 0
-    canvas_images = []
-
-    for image in images:
-        canvas_image = ImageTk.PhotoImage(image)
-        canvas_images.append(canvas_image)
-        canvas.create_image(x_offset, 0, anchor="nw", image=canvas_image)
-        x_offset += 40
-
-    canvas.pack()
-    root.mainloop()
