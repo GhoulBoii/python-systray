@@ -1,7 +1,7 @@
 import ctypes
 
 import commctrl
-import utils.icon_util as icon_util
+import utils.icon_utils as icon_util
 import win32api
 import win32con
 import win32gui
